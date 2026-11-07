@@ -73,6 +73,8 @@ namespace CapriDesktop
                 "Remove deletes the mod from her mods folder and undoes its settings. A code mod is stopped, but anything it already did stays done. The file you imported it from stays where it was.", "MainframeMods.cs", "Remove"),
             new Topic("Mod pages", "more mods|next page of mods",
                 "Back and Next move through the list when more mods are installed than fit on one page.", "MainframeMods.cs", "Mod pages"),
+            new Topic("Search your mods", "search my mods|search your mods|find a mod i installed|find an installed mod",
+                "Typing under INSTALLED shows only the mods you imported whose name or author has every word. Clearing the box brings them all back.", "MainframeMods.cs", "Search your mods"),
             new Topic("Minimize Mainframe", "minimize mainframe|minimise mainframe|minimize your settings",
                 "Minimize puts Capri Mainframe on the taskbar. Capri keeps running, and clicking its taskbar button brings the window back.", "Mainframe.cs", "Minimize"),
             new Topic("Close Mainframe", "close mainframe|close your settings",

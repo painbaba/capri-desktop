@@ -12,7 +12,7 @@ namespace CapriDesktop
 {
     internal sealed partial class Mainframe
     {
-        private const int ModRows = 4, ModRowTop = 204, ModRowHeight = 62;
+        private const int ModRows = 4, ModRowTop = 238, ModRowHeight = 62;
         private readonly List<KeyValuePair<Control, int>> modLeft = new List<KeyValuePair<Control, int>>();
         private readonly Label[] modNames = new Label[ModRows], modAbouts = new Label[ModRows];
         private readonly Key[] modSwitches = new Key[ModRows], modRemoves = new Key[ModRows], modPublishes = new Key[ModRows];
@@ -20,6 +20,8 @@ namespace CapriDesktop
         private Head modListHead;
         private readonly Key[] colourKeys = new Key[ArtColors.Slots];
         private Label modStatus, modEmpty, modPage;
+        private Entry modsSearch;
+        private List<Mod> shownMods = new List<Mod>();
         private bool modded;
         private int modFirst;
 
@@ -41,6 +43,14 @@ namespace CapriDesktop
             // A long import error, like a compiler's, is cut to two lines here, and hovering it shows the whole thing.
             ((Note)modStatus).Hovers = true;
             modListHead = Section("INSTALLED >", 0, 180);
+            modsSearch = new Entry();
+            modsSearch.Bounds = new Rectangle(28, 204, 328, 26);
+            modsSearch.Cue = "Search name or author";
+            modsSearch.Box.AccessibleName = "Search your installed mods";
+            modsSearch.Box.AccessibleDescription = "Search installed mods";
+            modsSearch.Box.TextChanged += delegate { modFirst = 0; FillMods(); };
+            Controls.Add(modsSearch);
+            Explain(modsSearch, "Search your mods", "MainframeMods.cs");
             modEmpty = ModLabel("No mods yet. Import a " + Mods.Extension + " file.", 28, ModRowTop, 328, 20, Font, Faint);
             for (int i = 0; i < ModRows; i++)
             {
@@ -131,13 +141,14 @@ namespace CapriDesktop
 
         private void FillMods()
         {
-            List<Mod> mods = capri.ModList.All;
-            int total = mods.Count, pageSize = ModRows;
+            shownMods = FilterMods(capri.ModList.All, modsSearch.Box.Text);
+            int total = shownMods.Count, pageSize = ModRows;
             modFirst = Math.Max(0, Math.Min(modFirst, (Math.Max(0, total - 1) / pageSize) * pageSize));
             modEmpty.Visible = total == 0;
+            modEmpty.Text = capri.ModList.All.Count == 0 ? "No mods yet. Import a " + Mods.Extension + " file." : "No mods match that.";
             for (int i = 0; i < ModRows; i++)
             {
-                Mod mod = modFirst + i < mods.Count ? mods[modFirst + i] : null;
+                Mod mod = modFirst + i < shownMods.Count ? shownMods[modFirst + i] : null;
                 modNames[i].Visible = modAbouts[i].Visible = modSwitches[i].Visible = modRemoves[i].Visible = modPublishes[i].Visible = mod != null;
                 if (mod == null) continue;
                 modNames[i].Text = mod.File.Name + (string.IsNullOrEmpty(mod.File.Version) ? "" : " v" + mod.File.Version);
@@ -165,6 +176,17 @@ namespace CapriDesktop
                 colourKeys[i].Invalidate();
             }
             if (capri.ModList.Problems.Count > 0) ModSays("Skipped " + capri.ModList.Problems[0], true);
+        }
+
+        private static List<Mod> FilterMods(List<Mod> mods, string search)
+        {
+            string[] words = (search ?? "").Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            return mods.FindAll(delegate(Mod mod)
+            {
+                string named = mod.File.Name + " " + mod.File.Author;
+                foreach (string word in words) if (named.IndexOf(word, StringComparison.OrdinalIgnoreCase) < 0) return false;
+                return true;
+            });
         }
 
         private void ModSays(string text, bool problem)
@@ -246,7 +268,7 @@ namespace CapriDesktop
 
         private bool SwitchMod(int row)
         {
-            Mod mod = capri.ModList.All[modFirst + row];
+            Mod mod = shownMods[modFirst + row];
             try
             {
                 bool done = capri.ModList.Set(mod, !mod.On, ModAsk);
@@ -275,7 +297,7 @@ namespace CapriDesktop
 
         private void RemoveMod(int row)
         {
-            Mod mod = capri.ModList.All[modFirst + row];
+            Mod mod = shownMods[modFirst + row];
             try
             {
                 capri.ModList.Remove(mod);
@@ -351,6 +373,29 @@ namespace CapriDesktop
             if (ImportMod(sample("wrong.txt", "{}"))) throw new Exception("A file that isn't a mod was let in.");
             if (Directory.GetFiles(mods.Folder, "*" + Mods.Extension).Length != 1) throw new Exception("A refused mod was left in her folder.");
             checks.Add("PASS mods: broken files, bad ids and bad names are refused");
+            string[] hats = { "hat-box|Hat Box|Vane", "hat-pin|Hat Pin|Vane", "hat-stand|Hat Stand|Pell", "hat-trick|Hat Trick|Moss", "sun-hat|Sun Hat|Pell" };
+            foreach (string hat in hats)
+            {
+                string[] parts = hat.Split('|');
+                if (!ImportMod(sample(parts[0] + Mods.Extension, "{\"format\":1,\"id\":\"" + parts[0] + "\",\"name\":\"" + parts[1] + "\",\"author\":\"" + parts[2] + "\",\"wake_names\":[\"Sky\"]}"))) throw new Exception("A mod for the search was refused: " + parts[0]);
+            }
+            if (mods.All.Count != 6 || shownMods.Count != 6 || modPage.Text != "Page 1 of 2") throw new Exception("Six installed mods did not page: " + modPage.Text);
+            modsSearch.Box.Text = "hat";
+            if (shownMods.Count != 5 || modNames[0].Text != "Hat Box" || modNames[3].Text != "Hat Trick") throw new Exception("Searching the installed mods filtered the wrong rows.");
+            modNext.PerformClick();
+            if (modPage.Text != "Page 2 of 2" || modNames[0].Text != "Sun Hat" || modNames[1].Visible) throw new Exception("Search did not keep its page.");
+            modBack.PerformClick();
+            modsSearch.Box.Text = "hat vane";
+            if (shownMods.Count != 2 || modNames[0].Text != "Hat Box" || modNames[1].Text != "Hat Pin") throw new Exception("Search did not need every word.");
+            modsSearch.Box.Text = "AVERY";
+            if (shownMods.Count != 1 || modNames[0].Text != "Custom Names" || modPage.Visible) throw new Exception("An author's name did not find their mod, or paged one row.");
+            modsSearch.Box.Text = "zzz";
+            if (!modEmpty.Visible || modEmpty.Text != "No mods match that." || modNames[0].Visible) throw new Exception("No matches was not said.");
+            modsSearch.Box.Text = "";
+            if (shownMods.Count != 6 || modEmpty.Visible || modPage.Text != "Page 1 of 2") throw new Exception("Clearing the search did not bring every mod back.");
+            checks.Add("PASS mods search: typing filters your mods by name or author, every word counts, paging keeps working, clearing brings them back and no matches is said");
+            for (int i = 0; i < hats.Length; i++) RemoveMod(0);
+            if (mods.All.Count != 1 || shownMods.Count != 1) throw new Exception("A searched mod survived removal.");
             RemoveMod(0);
             if (mods.All.Count != 0 || Hands.HeardName("hey nova")) throw new Exception("Removing a mod left it behind.");
             ShowSettings(true);
